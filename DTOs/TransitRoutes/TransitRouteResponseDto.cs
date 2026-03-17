@@ -10,4 +10,6 @@ public class TransitRouteResponseDto
     public required string Destination { get; set; }
     public TimeOnly StartingHour { get; set; }
     public TimeOnly EndingHour { get; set; }
+
+    public List<VehicleResponseDto> Vehicles { get; set; } = new List<VehicleResponseDto>();
 }
