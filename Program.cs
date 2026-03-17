@@ -94,12 +94,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
 
 // Add this line exactly here
-app.UseCors("AllowNextJsApp");
+app.UseCors("SecurePolicy");
 
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
