@@ -14,5 +14,7 @@ namespace TransportRouteApi.Models
         public required string Destination { get; set; }
         public TimeOnly StartingHour { get; set; }
         public TimeOnly EndingHour { get; set; }
+
+        public List<Vehicle> Vehicles { get; set; } = new List<Vehicle>();
     }
 }
