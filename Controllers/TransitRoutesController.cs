@@ -26,6 +26,8 @@ namespace TransportRouteApi.Controllers
         public async Task<ActionResult<IEnumerable<TransitRouteResponseDto>>> GetTransitRoutes()
         {
             var routes = await _context.TransitRoutes
+                .Include(route => route.Vehicles)
+                .ThenInclude(vehicle => vehicle.Category)
                 .Select(route => new TransitRouteResponseDto
                 {
                     Id = route.Id,
@@ -33,7 +35,14 @@ namespace TransportRouteApi.Controllers
                     StartingPoint = route.StartingPoint,
                     Destination = route.Destination,
                     StartingHour = route.StartingHour,
-                    EndingHour = route.EndingHour
+                    EndingHour = route.EndingHour,
+                    Vehicles = route.Vehicles.Select(vehicle => new VehicleResponseDto
+                    {
+                        Id = vehicle.Id,
+                        VehicleName = vehicle.VehicleName,
+                        CategoryName = vehicle.Category.CategoryName,
+                        RouteName = route.RouteName,
+                    }).ToList()
                 })
                 .ToListAsync();
 
