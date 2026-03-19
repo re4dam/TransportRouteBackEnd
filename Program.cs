@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TransportRouteApi.Data;
-using TransportRouteApi.Models;
-using TransportRouteApi.Converters;
+using TransportRoute.Core.Data;
+using TransportRoute.Core.Models;
+using TransportRoute.Core.Converters;
 using Bogus; // Meant to generate data
 
 var builder = WebApplication.CreateBuilder(args);

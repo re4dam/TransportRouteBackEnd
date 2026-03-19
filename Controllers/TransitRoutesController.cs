@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TransportRouteApi.Data;
-using TransportRouteApi.Models;
+using TransportRoute.Core.Data;
+using TransportRoute.Core.Models;
 using TransportRouteApi.DTOs;
 
 namespace TransportRouteApi.Controllers
