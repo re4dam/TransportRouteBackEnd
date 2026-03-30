@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using TransportRoute.Core.Data;
 using TransportRoute.Core.Models;
 using TransportRouteApi.DTOs;
@@ -12,6 +13,7 @@ namespace TransportRouteApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TransitRoutesController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -23,6 +25,7 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/TransitRoutes
         [HttpGet]
+        [AllowAnonymous] // Allow unauthenticated access to this endpoint
         public async Task<ActionResult<IEnumerable<TransitRouteResponseDto>>> GetTransitRoutes()
         {
             var routes = await _context.TransitRoutes
@@ -49,28 +52,56 @@ namespace TransportRouteApi.Controllers
             return Ok(routes);
         }
 
-        // GET: api/TransitRoutes/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<TransitRouteResponseDto>> GetTransitRoute(long id)
+        // GET: api/TransitRoutes
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<ActionResult<PaginatedResponseDto<TransitRouteResponseDto>>> GetTransitRoutes(
+            [FromQuery] string? keyword, 
+            [FromQuery] int pageNumber = 1, 
+            [FromQuery] int pageSize = 12)
         {
-            var route = await _context.TransitRoutes.FindAsync(id);
+            var query = _context.TransitRoutes.AsQueryable();
 
-            if (route == null)
+            if (!string.IsNullOrWhiteSpace(keyword))
             {
-                return NotFound();
+                query = query.Where(r => r.RouteName.Contains(keyword) || 
+                                        r.StartingPoint.Contains(keyword) || 
+                                        r.Destination.Contains(keyword));
             }
 
-            var responseDto = new TransitRouteResponseDto
-            {
-                Id = route.Id,
-                RouteName = route.RouteName,
-                StartingPoint = route.StartingPoint,
-                Destination = route.Destination,
-                StartingHour = route.StartingHour,
-                EndingHour = route.EndingHour
-            };
+            var totalCount = await query.CountAsync();
 
-            return Ok(responseDto);
+            var routes = await query
+                .Include(route => route.Vehicles)
+                    .ThenInclude(vehicle => vehicle.Category)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(route => new TransitRouteResponseDto
+                {
+                    Id = route.Id,
+                    RouteName = route.RouteName,
+                    StartingPoint = route.StartingPoint,
+                    Destination = route.Destination,
+                    StartingHour = route.StartingHour,
+                    EndingHour = route.EndingHour,
+                    Vehicles = route.Vehicles.Select(vehicle => new VehicleResponseDto
+                    {
+                        Id = vehicle.Id,
+                        VehicleName = vehicle.VehicleName,
+                        CategoryName = vehicle.Category.CategoryName,
+                        RouteName = route.RouteName,
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(new PaginatedResponseDto<TransitRouteResponseDto>
+            {
+                Items = routes,
+                TotalCount = totalCount,
+                CurrentPage = pageNumber,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
         }
 
         // GET: api/TransitRoutes/search?keyword=cicaheum&pageNumber=1&pageSize=50
@@ -138,6 +169,7 @@ namespace TransportRouteApi.Controllers
 
         // POST: api/TransitRoutes
         [HttpPost]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<ActionResult<TransitRouteResponseDto>> PostTransitRoute(CreateTransitRouteDto createDto)
         {
             var routeEntity = new TransitRoute
@@ -162,11 +194,12 @@ namespace TransportRouteApi.Controllers
                 EndingHour = routeEntity.EndingHour
             };
 
-            return CreatedAtAction(nameof(GetTransitRoute), new { id = routeEntity.Id }, responseDto);
+            return CreatedAtAction(nameof(GetTransitRoutes), new { id = routeEntity.Id }, responseDto);
         }
 
         // PUT: api/TransitRoutes/5
         [HttpPut("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<IActionResult> PutTransitRoute(long id, CreateTransitRouteDto updateDto)
         {
             var routeEntity = await _context.TransitRoutes.FindAsync(id);
@@ -188,6 +221,8 @@ namespace TransportRouteApi.Controllers
 
         // DELETE: api/TransitRoutes/5
         [HttpDelete("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
+        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete transit routes
         public async Task<IActionResult> DeleteTransitRoute(long id)
         {
             var routeEntity = await _context.TransitRoutes.FindAsync(id);

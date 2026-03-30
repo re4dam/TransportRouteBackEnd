@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TransportRoute.Core.Data;
@@ -11,6 +12,7 @@ namespace TransportRouteApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CategoryController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -22,6 +24,7 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/Category
         [HttpGet]
+        [AllowAnonymous] // Allow unauthenticated access to this endpoint
         public async Task<ActionResult<IEnumerable<CategoryResponseDto>>> GetCategories()
         {
             var categories = await _context.Categories
@@ -45,39 +48,54 @@ namespace TransportRouteApi.Controllers
             return Ok(categories);
         }
 
-        // GET: api/Category/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<CategoryResponseDto>> GetCategory(long id)
+        [HttpGet]
+        [AllowAnonymous] 
+        public async Task<ActionResult<PaginatedResponseDto<CategoryResponseDto>>> GetCategories(
+            [FromQuery] string? keyword, 
+            [FromQuery] int pageNumber = 1, 
+            [FromQuery] int pageSize = 12)
         {
-            // We use .Where() to find the specific ID before mapping to the DTO
-            var category = await _context.Categories
-                .Include(c => c.Vehicles)
-                    .ThenInclude(v => v.TransitRoute)
-                .Where(c => c.Id == id)
-                .Select(c => new CategoryResponseDto
-                {
-                    Id = c.Id,
-                    CategoryName = c.CategoryName,
-                    Vehicles = c.Vehicles.Select(v => new VehicleResponseDto
-                    {
-                        Id = v.Id,
-                        VehicleName = v.VehicleName,
-                        CategoryName = c.CategoryName,
-                        RouteName = v.TransitRoute.RouteName
-                    }).ToList()
-                })
-                .FirstOrDefaultAsync();
+            var query = _context.Categories.AsQueryable();
 
-            if (category == null)
+            if (!string.IsNullOrWhiteSpace(keyword))
             {
-                return NotFound();
+                query = query.Where(c => c.CategoryName.Contains(keyword));
             }
 
-            return Ok(category);
+            var totalCount = await query.CountAsync();
+
+            var categories = await query
+                .Include(category => category.Vehicles)
+                    .ThenInclude(vehicle => vehicle.TransitRoute)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(category => new CategoryResponseDto
+                {
+                    Id = category.Id,
+                    CategoryName = category.CategoryName,
+                    Vehicles = category.Vehicles.Select(vehicle => new VehicleResponseDto
+                    {
+                        Id = vehicle.Id,
+                        VehicleName = vehicle.VehicleName,
+                        CategoryName = category.CategoryName,
+                        RouteName = vehicle.TransitRoute.RouteName
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(new PaginatedResponseDto<CategoryResponseDto>
+            {
+                Items = categories,
+                TotalCount = totalCount,
+                CurrentPage = pageNumber,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
         }
 
         // POST: api/Category
         [HttpPost]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<ActionResult<CreateCategoryDto>> PostCategory(CreateCategoryDto categoryDto)
         {
             // 1. Map the incoming DTO to a raw Entity so EF Core can save it
@@ -90,7 +108,7 @@ namespace TransportRouteApi.Controllers
             await _context.SaveChangesAsync();
 
             // 2. Return a 201 Created status, pointing to the GetCategory endpoint
-            return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, new CreateCategoryDto 
+            return CreatedAtAction(nameof(GetCategories), new { id = category.Id }, new CreateCategoryDto 
             {
                 CategoryName = category.CategoryName,
                 // Vehicles = new List<VehicleResponseDto>() // Brand new category has no vehicles yet
@@ -99,6 +117,7 @@ namespace TransportRouteApi.Controllers
 
         // PUT: api/Category/5
         [HttpPut("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<IActionResult> PutCategory(long id, CreateCategoryDto categoryDto)
         {
             // 1. Find the existing entity in the database
@@ -132,6 +151,8 @@ namespace TransportRouteApi.Controllers
 
         // DELETE: api/Category/5
         [HttpDelete("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
+        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete categories
         public async Task<IActionResult> DeleteCategory(long id)
         {
             // Delete methods usually don't need DTOs since they just take an ID

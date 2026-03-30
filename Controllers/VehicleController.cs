@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ namespace TransportRouteApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class VehicleController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -24,6 +26,7 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/Vehicle
         [HttpGet]
+        [AllowAnonymous] // Allow unauthenticated access to this endpoint
         public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles()
         {
             var vehicles = await _context.Vehicles
@@ -41,14 +44,28 @@ namespace TransportRouteApi.Controllers
             return Ok(vehicles);
         }
 
-        // GET: api/Vehicle/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<VehicleResponseDto>> GetVehicle(long id)
+        // GET: api/Vehicle
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<ActionResult<PaginatedResponseDto<VehicleResponseDto>>> GetVehicles(
+            [FromQuery] string? keyword, 
+            [FromQuery] int pageNumber = 1, 
+            [FromQuery] int pageSize = 12)
         {
-            var vehicle = await _context.Vehicles
+            var query = _context.Vehicles.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                query = query.Where(v => v.VehicleName.Contains(keyword));
+            }
+
+            var totalCount = await query.CountAsync();
+
+            var vehicles = await query
                 .Include(v => v.Category)
                 .Include(v => v.TransitRoute)
-                .Where(v => v.Id == id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
                 .Select(v => new VehicleResponseDto
                 {
                     Id = v.Id,
@@ -56,19 +73,22 @@ namespace TransportRouteApi.Controllers
                     CategoryName = v.Category.CategoryName,
                     RouteName = v.TransitRoute.RouteName
                 })
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            if (vehicle == null)
+            return Ok(new PaginatedResponseDto<VehicleResponseDto>
             {
-                return NotFound();
-            }
-
-            return Ok(vehicle);
+                Items = vehicles,
+                TotalCount = totalCount,
+                CurrentPage = pageNumber,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
         }
 
         // PUT: api/Vehicle/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<IActionResult> PutVehicle(long id, CreateVehicleDto vehicleDto)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
@@ -104,6 +124,7 @@ namespace TransportRouteApi.Controllers
         // POST: api/Vehicle
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<ActionResult<VehicleResponseDto>> PostVehicle(CreateVehicleDto vehicleDto)
         {
             // 1. Map incoming DTO to raw entity
@@ -132,11 +153,13 @@ namespace TransportRouteApi.Controllers
                 RouteName = createdVehicle.TransitRoute.RouteName
             };
 
-            return CreatedAtAction(nameof(GetVehicle), new { id = vehicle.Id }, responseDto);
+            return CreatedAtAction(nameof(GetVehicles), new { id = vehicle.Id }, responseDto);
         }
 
         // DELETE: api/Vehicle/5
         [HttpDelete("{id}")]
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
+        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete vehicles
         public async Task<IActionResult> DeleteVehicle(long id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
