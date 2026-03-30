@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Bogus" Version="35.6.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TransportRoute.Core\TransportRoute.Core.csproj" />
+    <ProjectReference Include="..\TransportRoute.Security\TransportRoute.Security.csproj" />
   </ItemGroup>
 
 </Project>
