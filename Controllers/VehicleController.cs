@@ -26,26 +26,6 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/Vehicle
         [HttpGet]
-        [AllowAnonymous] // Allow unauthenticated access to this endpoint
-        public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles()
-        {
-            var vehicles = await _context.Vehicles
-                .Include(v => v.Category)
-                .Include(v => v.TransitRoute)
-                .Select(v => new VehicleResponseDto
-                {
-                    Id = v.Id,
-                    VehicleName = v.VehicleName,
-                    CategoryName = v.Category.CategoryName,
-                    RouteName = v.TransitRoute.RouteName
-                })
-                .ToListAsync();
-
-            return Ok(vehicles);
-        }
-
-        // GET: api/Vehicle
-        [HttpGet]
         [AllowAnonymous]
         public async Task<ActionResult<PaginatedResponseDto<VehicleResponseDto>>> GetVehicles(
             [FromQuery] string? keyword, 
@@ -83,6 +63,21 @@ namespace TransportRouteApi.Controllers
                 PageSize = pageSize,
                 TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
+        }
+
+        // GET: api/Vehicles/all
+        [HttpGet("all")] 
+        public async Task<ActionResult<IEnumerable<object>>> GetAllVehiclesForDropdown()
+        {
+            var dropdownData = await _context.Vehicles
+                .Select(v => new 
+                { 
+                    id = v.Id, 
+                    vehicleName = v.VehicleName 
+                })
+                .ToListAsync();
+
+            return Ok(dropdownData);
         }
 
         // PUT: api/Vehicle/5
