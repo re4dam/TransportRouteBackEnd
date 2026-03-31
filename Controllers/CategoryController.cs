@@ -24,31 +24,6 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/Category
         [HttpGet]
-        [AllowAnonymous] // Allow unauthenticated access to this endpoint
-        public async Task<ActionResult<IEnumerable<CategoryResponseDto>>> GetCategories()
-        {
-            var categories = await _context.Categories
-                .Include(category => category.Vehicles)
-                    .ThenInclude(vehicle => vehicle.TransitRoute)
-                .Select(category => new CategoryResponseDto
-                {
-                    Id = category.Id,
-                    CategoryName = category.CategoryName,
-                    Vehicles = category.Vehicles.Select(vehicle => new VehicleResponseDto
-                    {
-                        Id = vehicle.Id,
-                        VehicleName = vehicle.VehicleName,
-                        CategoryName = category.CategoryName,
-                        RouteName = vehicle.TransitRoute.RouteName
-                    }).ToList()
-                })
-                .ToListAsync();
-
-            // FIXED: Return the mapped DTOs, not the raw database context!
-            return Ok(categories);
-        }
-
-        [HttpGet]
         [AllowAnonymous] 
         public async Task<ActionResult<PaginatedResponseDto<CategoryResponseDto>>> GetCategories(
             [FromQuery] string? keyword, 
@@ -65,6 +40,7 @@ namespace TransportRouteApi.Controllers
             var totalCount = await query.CountAsync();
 
             var categories = await query
+                .OrderBy(c => c.Id)
                 .Include(category => category.Vehicles)
                     .ThenInclude(vehicle => vehicle.TransitRoute)
                 .Skip((pageNumber - 1) * pageSize)
@@ -91,6 +67,36 @@ namespace TransportRouteApi.Controllers
                 PageSize = pageSize,
                 TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
+        }
+
+        // GET: api/Category/all
+        [HttpGet("all")] 
+        public async Task<ActionResult<IEnumerable<object>>> GetAllCategoriesForDropdown()
+        {
+            // We use .Select() to strip out heavy data and ONLY send exactly what the dropdown needs.
+            // This dramatically reduces bandwidth and makes the API highly efficient!
+            var dropdownData = await _context.Categories
+                .Select(c => new 
+                { 
+                    id = c.Id, 
+                    categoryName = c.CategoryName 
+                })
+                .ToListAsync();
+
+            return Ok(dropdownData);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Category>> GetCategory(long id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+
+            if (category == null)
+            {
+                return NotFound();
+            }
+
+            return category; 
         }
 
         // POST: api/Category
