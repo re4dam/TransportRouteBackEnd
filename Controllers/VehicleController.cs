@@ -80,6 +80,20 @@ namespace TransportRouteApi.Controllers
             return Ok(dropdownData);
         }
 
+        // GET: api/Vehicle/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Vehicle>> GetVehicle(long id)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(id);
+
+            if (vehicle == null)
+            {
+                return NotFound();
+            }
+
+            return vehicle; 
+        }
+
         // PUT: api/Vehicle/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
