@@ -59,7 +59,7 @@ namespace TransportRouteApi.Controllers
                     {
                         Id = vehicle.Id,
                         VehicleName = vehicle.VehicleName,
-                        CategoryName = vehicle.Category.CategoryName,
+                        CategoryName = vehicle.Category != null ? vehicle.Category.CategoryName : string.Empty,
                         RouteName = route.RouteName,
                     }).ToList()
                 })
@@ -92,6 +92,41 @@ namespace TransportRouteApi.Controllers
                 .ToListAsync();
 
             return Ok(dropdownData);
+        }
+
+        // GET: api/TransitRoutes/5
+        [HttpGet("{id}")]
+        [AllowAnonymous]
+        public async Task<ActionResult<TransitRouteResponseDto>> GetTransitRoute(long id)
+        {
+            var route = await _context.TransitRoutes
+                .Include(r => r.Vehicles)
+                    .ThenInclude(v => v.Category)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (route == null)
+            {
+                return NotFound();
+            }
+
+            var responseDto = new TransitRouteResponseDto
+            {
+                Id = route.Id,
+                RouteName = route.RouteName,
+                StartingPoint = route.StartingPoint,
+                Destination = route.Destination,
+                StartingHour = route.StartingHour,
+                EndingHour = route.EndingHour,
+                Vehicles = route.Vehicles.Select(vehicle => new VehicleResponseDto
+                {
+                    Id = vehicle.Id,
+                    VehicleName = vehicle.VehicleName,
+                    CategoryName = vehicle.Category != null ? vehicle.Category.CategoryName : string.Empty,
+                    RouteName = route.RouteName,
+                }).ToList()
+            };
+
+            return Ok(responseDto);
         }
 
         // Probably will be looked again, this won't be used for a couple of times
@@ -185,7 +220,7 @@ namespace TransportRouteApi.Controllers
                 EndingHour = routeEntity.EndingHour
             };
 
-            return CreatedAtAction(nameof(GetTransitRoutes), new { id = routeEntity.Id }, responseDto);
+            return CreatedAtAction(nameof(GetTransitRoute), new { id = routeEntity.Id }, responseDto);
         }
 
         // PUT: api/TransitRoutes/5
