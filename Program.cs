@@ -95,6 +95,9 @@ builder.Services.AddAntiforgery(options =>
 
 var app = builder.Build();
 
+// 🚨 PLUG IN YOUR CUSTOM SAFETY NET HERE
+app.UseMiddleware<TransportRoute.Middleware.ExceptionMiddleware>();
+
 // Function on generating 100 data of routes
 using (var scope = app.Services.CreateScope())
 {
