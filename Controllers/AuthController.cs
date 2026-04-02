@@ -50,7 +50,9 @@ public class AuthController : ControllerBase
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         
         if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
-            return Unauthorized("Invalid credentials.");
+            return Unauthorized(new { message = "Invalid credentials." });
+
+        var roles = new string[] { user.Role };
 
         string token = _jwtProvider.Generate(user.Id.ToString(), user.Username, user.Role);
 
@@ -66,7 +68,7 @@ public class AuthController : ControllerBase
         // Attach the cookie to the HTTP Response
         Response.Cookies.Append("jwt", token, cookieOptions);
 
-        return Ok(new { message = "Logged in successfully" }); // No token in the body!
+        return Ok(new { message = "Logged in successfully", roles = roles }); // No token in the body!
     }
 
     [HttpGet("csrf-token")]
