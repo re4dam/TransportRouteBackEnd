@@ -10,6 +10,7 @@ using TransportRoute.Security.Hashing;
 using TransportRoute.Security.Tokens;
 using TransportRoute.Security.Interfaces;
 using TransportRoute.Security.Services;
+using TransportRoute.Security.Filters;
 
 using System.Text;
 using Bogus; // Meant to generate data
@@ -17,7 +18,12 @@ using Bogus; // Meant to generate data
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews()
+builder.Services.AddScoped<GlobalAuditFilter>();
+
+builder.Services.AddControllersWithViews(options =>
+    {
+        options.Filters.AddService<GlobalAuditFilter>();
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
