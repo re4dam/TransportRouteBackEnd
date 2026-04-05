@@ -30,8 +30,11 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(CreateUserDto request)
+    public async Task<IActionResult> Register([FromBody] CreateUserDto request)
     {
+        if (request == null)
+            return BadRequest(new { message = "Request body is required." });
+
         if (await _context.Users.AnyAsync(u => u.Username == request.Username))
             return BadRequest("Username already exists.");
 
@@ -62,12 +65,20 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginUserDto request)
+    public async Task<IActionResult> Login([FromBody] LoginUserDto request)
     {
+        if (request == null)
+            return BadRequest(new { message = "Request body is required." });
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
 
         if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid credentials." });
+
+        if (user.IsBanned)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This account has been suspended by an administrator." });
+        }
 
         if (!user.IsEmailVerified)
         {
@@ -120,6 +131,9 @@ public class AuthController : ControllerBase
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDto request)
     {
+        if (request == null || string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { message = "Verification token is required." });
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == request.Token);
         
         if (user == null) return BadRequest(new { message = "Invalid verification token." });
@@ -134,6 +148,9 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto request)
     {
+        if (request == null || string.IsNullOrWhiteSpace(request.Username))
+            return BadRequest(new { message = "Username is required." });
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
         
         // SECURITY RULE: Always return OK even if the user isn't found. 
@@ -165,6 +182,9 @@ public class AuthController : ControllerBase
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
     {
+        if (request == null || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { message = "Reset token and new password are required." });
+
         // 1. Find the user holding this exact token
         var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
 

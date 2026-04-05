@@ -99,6 +99,7 @@ namespace TransportRoute.Controllers
             return CreatedAtAction(nameof(GetUsers), new { id = newUser.Id }, responseDto);
         }
 
+        // POST: api/Users/toggle-ban/5
         [HttpPost("toggle-ban/{userId}")]
         [Authorize(Roles = "Admin")] // Ensure only Admins can hit this
         public async Task<IActionResult> ToggleUserBan(int userId)
