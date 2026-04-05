@@ -17,6 +17,12 @@ public class BanCheckMiddleware
 
     public async Task InvokeAsync(HttpContext context, AppDbContext dbContext)
     {
+        if (context.Request.Path.StartsWithSegments("/api/Auth/logout", StringComparison.OrdinalIgnoreCase))
+        {
+            await _next(context);
+            return;
+        }
+        
         // Only check if the user is actually authenticated
         if (context.User.Identity?.IsAuthenticated == true)
         {
