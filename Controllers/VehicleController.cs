@@ -80,6 +80,24 @@ namespace TransportRouteApi.Controllers
             return Ok(dropdownData);
         }
 
+        // GET: api/Vehicle/archives
+        [HttpGet("archives")]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> GetArchivedVehicles()
+        {
+            var archivedVehicles = await _context.Vehicles
+                .IgnoreQueryFilters()
+                .Where(v => v.IsArchived == true)
+                .Select(v => new
+                {
+                    v.Id,
+                    v.VehicleName
+                })
+                .ToListAsync();
+
+            return Ok(archivedVehicles);
+        }
+
         // GET: api/Vehicle/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Vehicle>> GetVehicle(long id)

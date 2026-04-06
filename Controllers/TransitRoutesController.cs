@@ -193,8 +193,9 @@ namespace TransportRouteApi.Controllers
             return Ok(response);
         }
 
+        // GET: api/TransitRoutes/archives
         [HttpGet("archives")]
-        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // 🚨 VIPs only
+        [Authorize(Roles = "SuperAdmin,RouteManager")] // 🚨 VIPs only
         public async Task<IActionResult> GetArchivedRoutes()
         {
             // 🚨 IgnoreQueryFilters() bypasses the magic shield!

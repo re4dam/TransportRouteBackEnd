@@ -86,6 +86,24 @@ namespace TransportRouteApi.Controllers
             return Ok(dropdownData);
         }
 
+        // GET: api/Category/archives
+        [HttpGet("archives")]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> GetArchivedCategories()
+        {
+            var archivedCategories = await _context.Categories
+                .IgnoreQueryFilters()
+                .Where(c => c.IsArchived == true)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.CategoryName
+                })
+                .ToListAsync();
+
+            return Ok(archivedCategories);
+        }
+
         // GET: api/Category/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Category>> GetCategory(long id)
