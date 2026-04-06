@@ -159,7 +159,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/Category/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete categories
+        [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete categories
         public async Task<IActionResult> DeleteCategory(long id)
         {
             // Delete methods usually don't need DTOs since they just take an ID
@@ -173,6 +173,46 @@ namespace TransportRouteApi.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/Category/5/archive
+        [HttpPatch("{id}/archive")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> ArchiveCategory(long id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null) return NotFound(new { message = "Category not found." });
+
+            // Soft-delete by flipping archive status.
+            category.IsArchived = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Category successfully moved to archives." });
+        }
+
+        // PATCH: api/Category/5/restore
+        [HttpPatch("{id}/restore")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> RestoreCategory(long id)
+        {
+            // 🚨 CRITICAL: We cannot use FindAsync here. We must bypass the 
+            // Global Query Filter so EF Core can actually "see" the archived item.
+            var category = await _context.Categories
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (category == null) return NotFound(new { message = "Category not found in archives." });
+
+            // Optional: Prevent them from restoring something that is already active
+            if (!category.IsArchived) return BadRequest(new { message = "Category is already active." });
+
+            // Flip the switch back to restore it
+            category.IsArchived = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Category successfully restored from archives." });
         }
 
         private bool CategoryExists(long id)

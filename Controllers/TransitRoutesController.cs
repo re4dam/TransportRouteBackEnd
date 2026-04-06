@@ -193,6 +193,24 @@ namespace TransportRouteApi.Controllers
             return Ok(response);
         }
 
+        [HttpGet("archives")]
+        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // 🚨 VIPs only
+        public async Task<IActionResult> GetArchivedRoutes()
+        {
+            // 🚨 IgnoreQueryFilters() bypasses the magic shield!
+            var archivedRoutes = await _context.TransitRoutes
+                .IgnoreQueryFilters() 
+                .Where(r => r.IsArchived == true)
+                .Select(r => new {
+                    r.Id,
+                    r.RouteName,
+                    // Include whatever details the admin needs to see
+                })
+                .ToListAsync();
+
+            return Ok(archivedRoutes);
+        }
+
         // POST: api/TransitRoutes
         [HttpPost]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
@@ -248,7 +266,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/TransitRoutes/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete transit routes
+        [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete transit routes
         public async Task<IActionResult> DeleteTransitRoute(long id)
         {
             var routeEntity = await _context.TransitRoutes.FindAsync(id);
@@ -261,6 +279,46 @@ namespace TransportRouteApi.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/TransitRoutes/5/archive
+        [HttpPatch("{id}/archive")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> ArchiveRoute(long id)
+        {
+            var route = await _context.TransitRoutes.FindAsync(id);
+            if (route == null) return NotFound(new { message = "Route not found." });
+
+            // Soft-delete by flipping archive status.
+            route.IsArchived = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Route successfully moved to archives." });
+        }
+
+        // PATCH: api/TransitRoutes/5/restore
+        [HttpPatch("{id}/restore")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> RestoreRoute(long id)
+        {
+            // 🚨 CRITICAL: We cannot use FindAsync here. We must bypass the 
+            // Global Query Filter so EF Core can actually "see" the archived item.
+            var route = await _context.TransitRoutes
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (route == null) return NotFound(new { message = "Route not found in archives." });
+
+            // Optional: Prevent them from restoring something that is already active
+            if (!route.IsArchived) return BadRequest(new { message = "Route is already active." });
+
+            // Flip the switch back to restore it
+            route.IsArchived = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Route successfully restored from archives." });
         }
 
         private bool TransitRouteExists(long id)

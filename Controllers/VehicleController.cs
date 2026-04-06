@@ -173,7 +173,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/Vehicle/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete vehicles
+        [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete vehicles
         public async Task<IActionResult> DeleteVehicle(long id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
@@ -186,6 +186,46 @@ namespace TransportRouteApi.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/Vehicle/5/archive
+        [HttpPatch("{id}/archive")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> ArchiveVehicle(long id)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(id);
+            if (vehicle == null) return NotFound(new { message = "Vehicle not found." });
+
+            // Soft-delete by flipping archive status.
+            vehicle.IsArchived = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Vehicle successfully moved to archives." });
+        }
+
+        // PATCH: api/Vehicle/5/restore
+        [HttpPatch("{id}/restore")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<IActionResult> RestoreVehicle(long id)
+        {
+            // 🚨 CRITICAL: We cannot use FindAsync here. We must bypass the 
+            // Global Query Filter so EF Core can actually "see" the archived item.
+            var vehicle = await _context.Vehicles
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(v => v.Id == id);
+
+            if (vehicle == null) return NotFound(new { message = "Vehicle not found in archives." });
+
+            // Optional: Prevent them from restoring something that is already active
+            if (!vehicle.IsArchived) return BadRequest(new { message = "Vehicle is already active." });
+
+            // Flip the switch back to restore it
+            vehicle.IsArchived = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Vehicle successfully restored from archives." });
         }
 
         private bool VehicleExists(long id)
